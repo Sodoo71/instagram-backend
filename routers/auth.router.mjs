@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import express from "express";
 import { UserModel } from "../models/user.model.mjs";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,35 +36,52 @@ router.post("/signup", async (req, res) => {
   }
 
   if (!email && !phone) {
-    return res.status(400).send({ message: "Credential must be Email or Phone number!" });
+    return res
+      .status(400)
+      .send({ message: "Credential must be Email or Phone number!" });
   }
 
   if (email) {
     const existingUserByEmail = await UserModel.findOne({ email: email });
     if (existingUserByEmail) {
-      return res.status(400).send({ message: "User with this email already exists" });
+      return res
+        .status(400)
+        .send({ message: "User with this email already exists" });
     }
   }
 
   if (phone) {
     const existingUserByPhone = await UserModel.findOne({ phone: phone });
     if (existingUserByPhone) {
-      return res.status(400).send({ message: "User with this phone already exists" });
+      return res
+        .status(400)
+        .send({ message: "User with this phone already exists" });
     }
   }
 
   if (body.password.length < 8) {
-    return res.status(400).send({ message: "Password must be greater than 8 characters" });
+    return res
+      .status(400)
+      .send({ message: "Password must be greater than 8 characters" });
   }
 
   if (passwordRegex.test(body.password)) {
-    return res.status(400).send({ message: "Password must include Upper and Lowercase letters and digit with special characters" });
+    return res
+      .status(400)
+      .send({
+        message:
+          "Password must include Upper and Lowercase letters and digit with special characters",
+      });
   }
 
   const existingUser = await UserModel.findOne({ username: body.username });
 
   if (existingUser) {
-    return res.status(400).send({ message: `User with username "${body.username}" already exists` });
+    return res
+      .status(400)
+      .send({
+        message: `User with username "${body.username}" already exists`,
+      });
   }
 
   const hashedPassword = bcrypt.hashSync(body.password, 10);
@@ -98,7 +116,13 @@ router.post("/signin", async (req, res) => {
   //   return item.email === body.credential || item.phone === body.credential || item.username === body.credential;
   // });
 
-  const user = await UserModel.findOne({ $or: [{ email: body.credential }, { phone: body.credential }, { username: body.credential }] });
+  const user = await UserModel.findOne({
+    $or: [
+      { email: body.credential },
+      { phone: body.credential },
+      { username: body.credential },
+    ],
+  });
 
   if (!user) {
     return res.status(400).send({ message: "Wrong credentials!" });
@@ -112,8 +136,35 @@ router.post("/signin", async (req, res) => {
   if (!isCorrectPassword) {
     return res.status(400).send({ message: "Wrong password!" });
   }
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: "1m",
+  });
 
-  return res.send({ message: "You are signed in", body: user });
+  return res.send({ message: "You are signed in", body: token });
+});
+
+router.get("/me", async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ message: "You are not authenticated" });
+  }
+  const token = authorization.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const id = payload.id;
+    const user = await UserModel.findById(id).populate("posts");
+    if (!user) {
+      return res.status(403).send({ message: "Session user not found!" });
+    }
+
+    return res.status(200).send({ message: "Success", body: user });
+  } catch (error) {
+    console.log("HI");
+    return res
+      .status(401)
+      .send({ message: "Unsuccess", body: JSON.stringify(error, null, 2) });
+  }
 });
 
 export default router;
