@@ -7,7 +7,9 @@ import { nanoid } from "nanoid";
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-   const result = await PostModel.find().populate("createdBy");
+  const result = await PostModel.find()
+  .populate("createdBy", "fullname username email") 
+  .sort({ createdAt: -1 });
   return res.send(result);
 });
 
