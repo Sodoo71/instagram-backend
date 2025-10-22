@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 import { nanoid } from "nanoid";
 
@@ -15,6 +16,7 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 UserSchema.virtual("posts", {
   ref: "Post",
   localField: "_id",
